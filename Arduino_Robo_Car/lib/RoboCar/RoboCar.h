@@ -1,46 +1,65 @@
-/*
-  RoboCar.h - Custom Library for 4WD Mecanum Robot
-  Abstracts motor, servo, and ultrasonic control for easy learning.
-*/
-
 #ifndef ROBOCAR_H
 #define ROBOCAR_H
 
+/*
+  RoboCar.h - Motor control library for a 4-wheel drive robot
+              using the Adafruit Motor Shield v1.
+
+  Usage:
+    RoboCar car;
+    car.begin();
+    car.moveForward(200);
+    car.turnLeft(150);
+    car.stop();
+
+  Motor port mapping (Adafruit Shield v1):
+    M1 -> Front Left
+    M2 -> Front Right
+    M3 -> Rear Left
+    M4 -> Rear Right
+*/
+
 #include <Arduino.h>
 #include <AFMotor.h>
-#include <Servo.h>
 
 class RoboCar {
-  public:
-    // Constructor
+public:
+    // Constructor - initialises motors on their fixed shield ports
     RoboCar();
 
-    // Initialization (Call this in setup)
+    // Call once in setup()
     void begin();
 
-    // --- Motor Control ---
-    void moveForward(uint8_t speed = 180);
-    void moveBackward(uint8_t speed = 180);
+    // ---- Basic motion ----
+    // speed: 0-255
+    void moveForward(uint8_t speed);
+    void moveBackward(uint8_t speed);
     void stop();
-    void turnLeft(uint8_t speed = 180);
-    void turnRight(uint8_t speed = 180);
 
-    // --- Sensors & Actuators ---
-    void look(int angle); // Controls the servo (0 to 180)
-    long getDistance();   // Returns ultrasonic distance in cm
+    // ---- Turns (tank-style pivot) ----
+    // Left wheels reverse, right wheels forward (and vice versa)
+    // speed: 0-255
+    void turnLeft(uint8_t speed);
+    void turnRight(uint8_t speed);
 
-  private:
-    // Hardware Objects (Hidden from the user)
-    AF_DCMotor motorFL;
-    AF_DCMotor motorFR;
-    AF_DCMotor motorRL;
-    AF_DCMotor motorRR;
-    Servo scanServo;
+    // ---- Assisted turns (arc, one side slower) ----
+    // outerSpeed: faster side, innerSpeed: slower side
+    void arcLeft(uint8_t outerSpeed, uint8_t innerSpeed);
+    void arcRight(uint8_t outerSpeed, uint8_t innerSpeed);
 
-    // Pin Definitions
-    const uint8_t TRIG_PIN = A0;
-    const uint8_t ECHO_PIN = A3;
-    const uint8_t SERVO_PIN = 10;
+    // ---- Individual motor access (advanced users) ----
+    // motor: 1=FL, 2=FR, 3=RL, 4=RR
+    // direction: FORWARD, BACKWARD, RELEASE  (AFMotor constants)
+    void setMotor(uint8_t motor, uint8_t direction, uint8_t speed);
+
+private:
+    AF_DCMotor _motorFL;
+    AF_DCMotor _motorFR;
+    AF_DCMotor _motorRL;
+    AF_DCMotor _motorRR;
+
+    // Internal helper - apply same speed and direction to all four motors
+    void _setAll(uint8_t direction, uint8_t speed);
 };
 
-#endif
+#endif // ROBOCAR_H

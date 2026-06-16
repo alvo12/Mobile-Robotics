@@ -1,103 +1,127 @@
 /*
-  RoboCar.cpp - Implementation of the RoboCar Library
+  RoboCar.cpp - Implementation of the RoboCar motor control library
 */
 
 #include "RoboCar.h"
 
-// Constructor: Initializes the AFMotor objects on their specific ports
-RoboCar::RoboCar() : motorFL(1), motorFR(2), motorRL(3), motorRR(4) {
-    // Initialization happens here before the sketch runs
-}
+// ------------------------------------------------------------
+// Constructor
+// Ports match the physical shield terminals M1-M4
+// ------------------------------------------------------------
+RoboCar::RoboCar() : _motorFL(1), _motorFR(2), _motorRL(3), _motorRR(4) {}
 
 void RoboCar::begin() {
-    // Set up ultrasonic pins
-    pinMode(TRIG_PIN, OUTPUT);
-    pinMode(ECHO_PIN, INPUT);
-
-    // Set up and center the servo
-    scanServo.attach(SERVO_PIN);
-    look(90); // Default to center
-    delay(500);
-
-    // Ensure motors are stopped on boot
-    stop();
+    stop(); // Ensure motors are idle on boot
 }
 
-// ===================== Motor Control =====================
-
+// ------------------------------------------------------------
+// Basic motion
+// ------------------------------------------------------------
 void RoboCar::moveForward(uint8_t speed) {
-    motorFL.setSpeed(speed);
-    motorFR.setSpeed(speed);
-    motorRL.setSpeed(speed);
-    motorRR.setSpeed(speed);
-
-    motorFL.run(FORWARD);
-    motorFR.run(FORWARD);
-    motorRL.run(FORWARD);
-    motorRR.run(FORWARD);
+    _setAll(FORWARD, speed);
 }
 
 void RoboCar::moveBackward(uint8_t speed) {
-    motorFL.setSpeed(speed);
-    motorFR.setSpeed(speed);
-    motorRL.setSpeed(speed);
-    motorRR.setSpeed(speed);
-
-    motorFL.run(BACKWARD);
-    motorFR.run(BACKWARD);
-    motorRL.run(BACKWARD);
-    motorRR.run(BACKWARD);
+    _setAll(BACKWARD, speed);
 }
 
 void RoboCar::stop() {
-    motorFL.run(RELEASE);
-    motorFR.run(RELEASE);
-    motorRL.run(RELEASE);
-    motorRR.run(RELEASE);
+    _motorFL.run(RELEASE);
+    _motorFR.run(RELEASE);
+    _motorRL.run(RELEASE);
+    _motorRR.run(RELEASE);
 }
 
-// Simple pivot turns (Tank style)
+// ------------------------------------------------------------
+// Tank-style pivot turns
+// One side drives, the other releases (freewheels)
+// For a tighter spin, swap RELEASE for BACKWARD on the idle side
+// ------------------------------------------------------------
 void RoboCar::turnLeft(uint8_t speed) {
-    motorFL.setSpeed(speed);
-    motorFR.setSpeed(speed);
-    motorRL.setSpeed(speed);
-    motorRR.setSpeed(speed);
+    // Right side drives forward, left side freewheels
+    _motorFL.setSpeed(0);
+    _motorRL.setSpeed(0);
+    _motorFR.setSpeed(speed);
+    _motorRR.setSpeed(speed);
 
-    motorFL.run(RELEASE);
-    motorRL.run(FORWARD);
-    motorFR.run(RELEASE);
-    motorRR.run(FORWARD);
+    _motorFL.run(RELEASE);
+    _motorRL.run(RELEASE);
+    _motorFR.run(FORWARD);
+    _motorRR.run(FORWARD);
 }
 
 void RoboCar::turnRight(uint8_t speed) {
-    motorFL.setSpeed(speed);
-    motorFR.setSpeed(speed);
-    motorRL.setSpeed(speed);
-    motorRR.setSpeed(speed);
+    // Left side drives forward, right side freewheels
+    _motorFL.setSpeed(speed);
+    _motorRL.setSpeed(speed);
+    _motorFR.setSpeed(0);
+    _motorRR.setSpeed(0);
 
-    motorFL.run(FORWARD);
-    motorRL.run(RELEASE);
-    motorFR.run(FORWARD);
-    motorRR.run(RELEASE);
+    _motorFL.run(FORWARD);
+    _motorRL.run(FORWARD);
+    _motorFR.run(RELEASE);
+    _motorRR.run(RELEASE);
 }
 
-// ===================== Sensors & Actuators =====================
+// ------------------------------------------------------------
+// Arc turns - both sides move, one faster than the other
+// Produces a smooth curve rather than a pivot
+// ------------------------------------------------------------
+void RoboCar::arcLeft(uint8_t outerSpeed, uint8_t innerSpeed) {
+    // Right side is the outer (faster) arc
+    _motorFL.setSpeed(innerSpeed);
+    _motorRL.setSpeed(innerSpeed);
+    _motorFR.setSpeed(outerSpeed);
+    _motorRR.setSpeed(outerSpeed);
 
-void RoboCar::look(int angle) {
-    // Constrain the angle between 0 and 180 for safety
-    angle = constrain(angle, 0, 180);
-    scanServo.write(angle);
+    _motorFL.run(FORWARD);
+    _motorRL.run(FORWARD);
+    _motorFR.run(FORWARD);
+    _motorRR.run(FORWARD);
 }
 
-long RoboCar::getDistance() {
-    digitalWrite(TRIG_PIN, LOW);
-    delayMicroseconds(2);
-    digitalWrite(TRIG_PIN, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(TRIG_PIN, LOW);
+void RoboCar::arcRight(uint8_t outerSpeed, uint8_t innerSpeed) {
+    // Left side is the outer (faster) arc
+    _motorFL.setSpeed(outerSpeed);
+    _motorRL.setSpeed(outerSpeed);
+    _motorFR.setSpeed(innerSpeed);
+    _motorRR.setSpeed(innerSpeed);
 
-    long duration = pulseIn(ECHO_PIN, HIGH, 30000);
-    if (duration == 0) return 0; // Return 0 if no echo
-    
-    return duration * 0.0343 / 2; // Convert to cm
+    _motorFL.run(FORWARD);
+    _motorRL.run(FORWARD);
+    _motorFR.run(FORWARD);
+    _motorRR.run(FORWARD);
+}
+
+// ------------------------------------------------------------
+// Individual motor control - for advanced users
+// motor: 1=FL, 2=FR, 3=RL, 4=RR
+// direction: FORWARD, BACKWARD, RELEASE (AFMotor constants)
+// ------------------------------------------------------------
+void RoboCar::setMotor(uint8_t motor, uint8_t direction, uint8_t speed) {
+    AF_DCMotor* m = nullptr;
+    switch (motor) {
+        case 1: m = &_motorFL; break;
+        case 2: m = &_motorFR; break;
+        case 3: m = &_motorRL; break;
+        case 4: m = &_motorRR; break;
+        default: return; // Invalid motor number, do nothing
+    }
+    m->setSpeed(speed);
+    m->run(direction);
+}
+
+// ------------------------------------------------------------
+// Private helper
+// ------------------------------------------------------------
+void RoboCar::_setAll(uint8_t direction, uint8_t speed) {
+    _motorFL.setSpeed(speed);
+    _motorFR.setSpeed(speed);
+    _motorRL.setSpeed(speed);
+    _motorRR.setSpeed(speed);
+
+    _motorFL.run(direction);
+    _motorFR.run(direction);
+    _motorRL.run(direction);
+    _motorRR.run(direction);
 }
