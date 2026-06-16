@@ -1,2 +1,2 @@
-adafruit/Adafruit Motor Shield library@^1.0.1
-Servo
+arduino-libraries/Servo @ ^1.2.1
+adafruit/Adafruit Motor Shield library @ ^1.0.1
